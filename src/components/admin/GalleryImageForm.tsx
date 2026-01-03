@@ -1,10 +1,12 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { createSupabaseClient } from '@/lib/supabase/browser';
+import { uploadFileToStorage } from '@/lib/supabase/storage';
 import type { GalleryImage } from '@/lib/supabase/types';
 import Link from 'next/link';
+import Image from 'next/image';
 
 interface GalleryImageFormProps {
   image?: GalleryImage;
@@ -12,14 +14,30 @@ interface GalleryImageFormProps {
 
 export default function GalleryImageForm({ image }: GalleryImageFormProps) {
   const router = useRouter();
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [loading, setLoading] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [error, setError] = useState('');
+  const [previewUrl, setPreviewUrl] = useState<string | null>(image?.src || null);
   const [formData, setFormData] = useState({
     src: image?.src || '',
     alt: image?.alt || '',
     title: image?.title || '',
     display_order: image?.display_order || 0,
   });
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.type.startsWith('image/')) {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          setPreviewUrl(reader.result as string);
+        };
+        reader.readAsDataURL(file);
+      }
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -29,17 +47,44 @@ export default function GalleryImageForm({ image }: GalleryImageFormProps) {
     const supabase = createSupabaseClient();
     
     try {
+      // Handle file upload if a new file is selected
+      const fileInput = fileInputRef.current;
+      let imageUrl = formData.src;
+
+      if (fileInput?.files?.[0]) {
+        setUploading(true);
+        const uploadResult = await uploadFileToStorage(
+          'gallery-images',
+          fileInput.files[0]
+        );
+
+        if (uploadResult.error || !uploadResult.url) {
+          setError(`Upload failed: ${uploadResult.error || 'Unknown error'}`);
+          setLoading(false);
+          setUploading(false);
+          return;
+        }
+
+        imageUrl = uploadResult.url;
+        setUploading(false);
+      }
+
+      const dataToSave = {
+        ...formData,
+        src: imageUrl,
+      };
+
       if (image) {
         const { error: updateError } = await supabase
           .from('gallery_images')
-          .update(formData)
+          .update(dataToSave)
           .eq('id', image.id);
 
         if (updateError) throw updateError;
       } else {
         const { error: insertError } = await supabase
           .from('gallery_images')
-          .insert([formData]);
+          .insert([dataToSave]);
 
         if (insertError) throw insertError;
       }
@@ -49,6 +94,7 @@ export default function GalleryImageForm({ image }: GalleryImageFormProps) {
     } catch (err: any) {
       setError(err.message || 'An error occurred');
       setLoading(false);
+      setUploading(false);
     }
   };
 
@@ -56,20 +102,33 @@ export default function GalleryImageForm({ image }: GalleryImageFormProps) {
     <div className="bg-white p-8 rounded-lg shadow-md">
       <form onSubmit={handleSubmit} className="space-y-6">
         <div>
-          <label htmlFor="src" className="block text-sm font-medium text-gray-700 mb-2">
-            Image URL *
+          <label htmlFor="image" className="block text-sm font-medium text-gray-700 mb-2">
+            Gallery Image *
           </label>
+          
+          {previewUrl && (
+            <div className="mb-4">
+              <Image
+                src={previewUrl}
+                alt="Preview"
+                width={300}
+                height={200}
+                className="rounded-lg border border-gray-300 object-cover"
+                unoptimized
+              />
+            </div>
+          )}
+
           <input
-            type="url"
-            id="src"
-            required
-            value={formData.src}
-            onChange={(e) => setFormData({ ...formData, src: e.target.value })}
+            ref={fileInputRef}
+            type="file"
+            id="image"
+            accept="image/*"
+            onChange={handleFileChange}
             className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent focus:border-transparent outline-none"
-            placeholder="https://..."
           />
           <p className="mt-1 text-sm text-gray-500">
-            Upload image to Supabase Storage and paste the public URL here
+            {image?.src ? 'Select a new image to replace the current one, or leave empty to keep current image.' : 'Upload an image file (JPG, PNG, etc.)'}
           </p>
         </div>
 

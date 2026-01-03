@@ -1,10 +1,12 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { createSupabaseClient } from '@/lib/supabase/browser';
+import { uploadFileToStorage } from '@/lib/supabase/storage';
 import type { InvestorDocument } from '@/lib/supabase/types';
 import Link from 'next/link';
+import { HiDocumentText } from 'react-icons/hi';
 
 interface InvestorDocumentFormProps {
   document?: InvestorDocument;
@@ -12,8 +14,11 @@ interface InvestorDocumentFormProps {
 
 export default function InvestorDocumentForm({ document }: InvestorDocumentFormProps) {
   const router = useRouter();
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [loading, setLoading] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [error, setError] = useState('');
+  const [fileName, setFileName] = useState<string | null>(document?.file_url ? document.name : null);
   const [formData, setFormData] = useState({
     name: document?.name || '',
     description: document?.description || '',
@@ -21,6 +26,17 @@ export default function InvestorDocumentForm({ document }: InvestorDocumentFormP
     icon_type: document?.icon_type || 'document' as 'document' | 'chart',
     display_order: document?.display_order || 0,
   });
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setFileName(file.name);
+      // Auto-fill name if empty
+      if (!formData.name) {
+        setFormData({ ...formData, name: file.name.replace(/\.[^/.]+$/, '') });
+      }
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -30,17 +46,44 @@ export default function InvestorDocumentForm({ document }: InvestorDocumentFormP
     const supabase = createSupabaseClient();
     
     try {
+      // Handle file upload if a new file is selected
+      const fileInput = fileInputRef.current;
+      let fileUrl = formData.file_url;
+
+      if (fileInput?.files?.[0]) {
+        setUploading(true);
+        const uploadResult = await uploadFileToStorage(
+          'investor-documents',
+          fileInput.files[0]
+        );
+
+        if (uploadResult.error || !uploadResult.url) {
+          setError(`Upload failed: ${uploadResult.error || 'Unknown error'}`);
+          setLoading(false);
+          setUploading(false);
+          return;
+        }
+
+        fileUrl = uploadResult.url;
+        setUploading(false);
+      }
+
+      const dataToSave = {
+        ...formData,
+        file_url: fileUrl,
+      };
+
       if (document) {
         const { error: updateError } = await supabase
           .from('investor_documents')
-          .update(formData)
+          .update(dataToSave)
           .eq('id', document.id);
 
         if (updateError) throw updateError;
       } else {
         const { error: insertError } = await supabase
           .from('investor_documents')
-          .insert([formData]);
+          .insert([dataToSave]);
 
         if (insertError) throw insertError;
       }
@@ -50,6 +93,7 @@ export default function InvestorDocumentForm({ document }: InvestorDocumentFormP
     } catch (err: any) {
       setError(err.message || 'An error occurred');
       setLoading(false);
+      setUploading(false);
     }
   };
 
@@ -137,13 +181,19 @@ export default function InvestorDocumentForm({ document }: InvestorDocumentFormP
           </div>
         )}
 
+        {uploading && (
+          <div className="bg-blue-50 border border-blue-200 text-blue-700 px-4 py-3 rounded-lg text-sm">
+            Uploading file...
+          </div>
+        )}
+
         <div className="flex space-x-4">
           <button
             type="submit"
-            disabled={loading}
+            disabled={loading || uploading}
             className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {loading ? 'Saving...' : document ? 'Update Document' : 'Add Document'}
+            {uploading ? 'Uploading...' : loading ? 'Saving...' : document ? 'Update Document' : 'Add Document'}
           </button>
           <Link href="/admin/investors" className="btn-secondary">
             Cancel

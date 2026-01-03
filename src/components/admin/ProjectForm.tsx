@@ -1,10 +1,12 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { createSupabaseClient } from '@/lib/supabase/browser';
+import { uploadFileToStorage } from '@/lib/supabase/storage';
 import type { Project } from '@/lib/supabase/types';
 import Link from 'next/link';
+import Image from 'next/image';
 
 interface ProjectFormProps {
   project?: Project;
@@ -12,8 +14,11 @@ interface ProjectFormProps {
 
 export default function ProjectForm({ project }: ProjectFormProps) {
   const router = useRouter();
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [loading, setLoading] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [error, setError] = useState('');
+  const [previewUrl, setPreviewUrl] = useState<string | null>(project?.image_url || null);
   const [formData, setFormData] = useState({
     title: project?.title || '',
     location: project?.location || '',
@@ -23,6 +28,20 @@ export default function ProjectForm({ project }: ProjectFormProps) {
     display_order: project?.display_order || 0,
   });
 
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      // Create preview for image files
+      if (file.type.startsWith('image/')) {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          setPreviewUrl(reader.result as string);
+        };
+        reader.readAsDataURL(file);
+      }
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -31,11 +50,38 @@ export default function ProjectForm({ project }: ProjectFormProps) {
     const supabase = createSupabaseClient();
     
     try {
+      // Handle file upload if a new file is selected
+      const fileInput = fileInputRef.current;
+      let imageUrl = formData.image_url;
+
+      if (fileInput?.files?.[0]) {
+        setUploading(true);
+        const uploadResult = await uploadFileToStorage(
+          'project-images',
+          fileInput.files[0]
+        );
+
+        if (uploadResult.error || !uploadResult.url) {
+          setError(`Upload failed: ${uploadResult.error || 'Unknown error'}`);
+          setLoading(false);
+          setUploading(false);
+          return;
+        }
+
+        imageUrl = uploadResult.url;
+        setUploading(false);
+      }
+
+      const dataToSave = {
+        ...formData,
+        image_url: imageUrl,
+      };
+
       if (project) {
         // Update existing project
         const { error: updateError } = await supabase
           .from('projects')
-          .update(formData)
+          .update(dataToSave)
           .eq('id', project.id);
 
         if (updateError) throw updateError;
@@ -43,7 +89,7 @@ export default function ProjectForm({ project }: ProjectFormProps) {
         // Create new project
         const { error: insertError } = await supabase
           .from('projects')
-          .insert([formData]);
+          .insert([dataToSave]);
 
         if (insertError) throw insertError;
       }
@@ -53,6 +99,7 @@ export default function ProjectForm({ project }: ProjectFormProps) {
     } catch (err: any) {
       setError(err.message || 'An error occurred');
       setLoading(false);
+      setUploading(false);
     }
   };
 
@@ -153,13 +200,19 @@ export default function ProjectForm({ project }: ProjectFormProps) {
           </div>
         )}
 
+        {uploading && (
+          <div className="bg-blue-50 border border-blue-200 text-blue-700 px-4 py-3 rounded-lg text-sm">
+            Uploading image...
+          </div>
+        )}
+
         <div className="flex space-x-4">
           <button
             type="submit"
-            disabled={loading}
+            disabled={loading || uploading}
             className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {loading ? 'Saving...' : project ? 'Update Project' : 'Create Project'}
+            {uploading ? 'Uploading...' : loading ? 'Saving...' : project ? 'Update Project' : 'Create Project'}
           </button>
           <Link href="/admin/projects" className="btn-secondary">
             Cancel
