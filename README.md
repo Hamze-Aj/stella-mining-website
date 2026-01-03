@@ -230,3 +230,7 @@ This is a private project. For updates or changes, please contact the developmen
 **Built with ❤️ for Stella Mining Company**
 
 
+
+
+
+

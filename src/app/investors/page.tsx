@@ -1,47 +1,67 @@
 import React from 'react';
 import Link from 'next/link';
 import { HiDownload, HiDocumentText, HiChartBar } from 'react-icons/hi';
+import { getInvestorDocuments } from '@/lib/supabase/queries';
 
-const documents = [
-  {
-    name: 'Corporate Documents',
-    description: 'Company registration, licenses, and corporate structure documents',
-    link: '/documents/corporate-documents.pdf',
-    icon: HiDocumentText,
-  },
-  {
-    name: 'Corporate Governance',
-    description: 'Governance policies, board structure, and management information',
-    link: '/documents/corporate-governance.pdf',
-    icon: HiDocumentText,
-  },
-  {
-    name: 'Shareholder Analysis',
-    description: 'Current shareholder structure and ownership information',
-    link: '/documents/shareholder-analysis.pdf',
-    icon: HiChartBar,
-  },
-  {
-    name: 'Annual Report 2023',
-    description: 'Comprehensive annual report including financial and operational highlights',
-    link: '/documents/annual-report-2023.pdf',
-    icon: HiDocumentText,
-  },
-  {
-    name: 'Environmental Impact Assessment',
-    description: 'Environmental assessments and sustainability reports',
-    link: '/documents/environmental-assessment.pdf',
-    icon: HiDocumentText,
-  },
-  {
-    name: 'Mining Licenses',
-    description: 'Current mining and exploration licenses documentation',
-    link: '/documents/mining-licenses.pdf',
-    icon: HiDocumentText,
-  },
-];
+export default async function Investors() {
+  // Fetch documents from Supabase, fallback to empty array if error
+  const documentsData = await getInvestorDocuments();
+  
+  // Map icon types to icon components
+  const iconMap = {
+    document: HiDocumentText,
+    chart: HiChartBar,
+  };
+  
+  // Transform Supabase data to match component interface
+  const documents = documentsData.map((doc) => ({
+    name: doc.name,
+    description: doc.description,
+    link: doc.file_url,
+    icon: iconMap[doc.icon_type] || HiDocumentText,
+  }));
 
-export default function Investors() {
+  // Fallback to hardcoded data if Supabase is not configured or returns empty
+  const fallbackDocuments = [
+    {
+      name: 'Corporate Documents',
+      description: 'Company registration, licenses, and corporate structure documents',
+      link: '/documents/corporate-documents.pdf',
+      icon: HiDocumentText,
+    },
+    {
+      name: 'Corporate Governance',
+      description: 'Governance policies, board structure, and management information',
+      link: '/documents/corporate-governance.pdf',
+      icon: HiDocumentText,
+    },
+    {
+      name: 'Shareholder Analysis',
+      description: 'Current shareholder structure and ownership information',
+      link: '/documents/shareholder-analysis.pdf',
+      icon: HiChartBar,
+    },
+    {
+      name: 'Annual Report 2023',
+      description: 'Comprehensive annual report including financial and operational highlights',
+      link: '/documents/annual-report-2023.pdf',
+      icon: HiDocumentText,
+    },
+    {
+      name: 'Environmental Impact Assessment',
+      description: 'Environmental assessments and sustainability reports',
+      link: '/documents/environmental-assessment.pdf',
+      icon: HiDocumentText,
+    },
+    {
+      name: 'Mining Licenses',
+      description: 'Current mining and exploration licenses documentation',
+      link: '/documents/mining-licenses.pdf',
+      icon: HiDocumentText,
+    },
+  ];
+
+  const displayDocuments = documents.length > 0 ? documents : fallbackDocuments;
   return (
     <div className="section-padding bg-gray-50 min-h-screen">
       <div className="container-custom">
@@ -54,7 +74,7 @@ export default function Investors() {
         </div>
 
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
-          {documents.map((doc, index) => {
+          {displayDocuments.map((doc, index) => {
             const IconComponent = doc.icon;
             return (
               <div
@@ -128,5 +148,7 @@ export default function Investors() {
     </div>
   );
 }
+
+
 
 

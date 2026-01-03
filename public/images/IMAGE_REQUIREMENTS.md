@@ -50,3 +50,7 @@ Example placeholder URL format:
 - `https://via.placeholder.com/1920x1080/1f2937/ffffff?text=Stella+Mining`
 
 
+
+
+
+
