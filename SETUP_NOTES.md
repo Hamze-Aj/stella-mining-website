@@ -48,3 +48,4 @@ If your keys look different, please copy the keys from the Supabase dashboard AP
 The site should now connect to Supabase!
 
 
+

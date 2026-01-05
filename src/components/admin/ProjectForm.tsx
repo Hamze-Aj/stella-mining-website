@@ -164,20 +164,33 @@ export default function ProjectForm({ project }: ProjectFormProps) {
         </div>
 
         <div>
-          <label htmlFor="image_url" className="block text-sm font-medium text-gray-700 mb-2">
-            Image URL *
+          <label htmlFor="image" className="block text-sm font-medium text-gray-700 mb-2">
+            Project Image *
           </label>
+          
+          {previewUrl && (
+            <div className="mb-4">
+              <Image
+                src={previewUrl}
+                alt="Preview"
+                width={300}
+                height={200}
+                className="rounded-lg border border-gray-300 object-cover"
+                unoptimized
+              />
+            </div>
+          )}
+
           <input
-            type="url"
-            id="image_url"
-            required
-            value={formData.image_url}
-            onChange={(e) => setFormData({ ...formData, image_url: e.target.value })}
+            ref={fileInputRef}
+            type="file"
+            id="image"
+            accept="image/*"
+            onChange={handleFileChange}
             className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent focus:border-transparent outline-none"
-            placeholder="https://..."
           />
           <p className="mt-1 text-sm text-gray-500">
-            Upload image to Supabase Storage and paste the public URL here
+            {project?.image_url ? 'Select a new image to replace the current one, or leave empty to keep current image.' : 'Upload an image file (JPG, PNG, etc.)'}
           </p>
         </div>
 

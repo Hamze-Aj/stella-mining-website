@@ -66,3 +66,4 @@ Updated Supabase authentication to use `@supabase/ssr` package which properly ha
 - `src/lib/supabase/queries.ts` - Async server client
 - API routes (3 files) - Server client usage
 
+
